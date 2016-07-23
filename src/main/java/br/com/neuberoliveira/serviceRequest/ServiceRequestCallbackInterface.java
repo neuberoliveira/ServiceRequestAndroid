@@ -1,4 +1,4 @@
-package com.neuberdesigns.ServiceRequest;
+package br.com.neuberoliveira.serviceRequest;
 
 /**
  * Created by neuber on 14/04/14.
