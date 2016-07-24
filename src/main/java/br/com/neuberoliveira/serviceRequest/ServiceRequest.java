@@ -363,7 +363,9 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 			Log.d(LOG_ID, "The response raw: " + getRawServerResponse());
 			Log.d(LOG_ID, "Parameters: " + TextUtils.join("&", parametersList));
 			//Log.d(LOG_ID, "Uploads: " + TextUtils.join("&", uploadList));
-			Log.d(LOG_ID, "Full Request: \n" + fullRequest);
+			
+			if(isPost())
+				Log.d(LOG_ID, "Full Request: \n" + fullRequest);
 		}
 
 		return jsonResponse;
