@@ -3,12 +3,18 @@ package br.com.neuberoliveira.serviceRequest;
 import android.text.TextUtils;
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Created by neuber on 29/08/15.
@@ -35,32 +41,100 @@ public abstract class JsonModel{
 
 	private boolean setField(String property, String key, JSONObject json) {
 		boolean set = false;
-
+		boolean isAccessible;
+		
 		Field field;
 		Class fieldType;
-		Method callerJson;
 		try {
 			field = this.getClass().getDeclaredField(property);
-			field.setAccessible(true);
+			isAccessible = field.isAccessible();
+			if(!isAccessible)
+				field.setAccessible(true);
+			
 			fieldType = field.getType();
-			callerJson = json.getClass().getMethod(buildGetMethod(fieldType.getName()), String.class);
-
-			if (!json.isNull(key)) {
-				field.set(this, callerJson.invoke(json, key));
+			if( isList(field) ){
+				Type type = field.getGenericType();
+				Type[] listTypes = getListTypes(type);
+				Class<?> listType = null;
+				List<Object> tempList = new ArrayList<>();
+				JSONArray jsonList = json.getJSONArray(key);
+				Object listItem;
+				boolean isModel = false;
+				
+				if( !json.isNull(key) ){
+					
+					for (Type tp : listTypes) {
+						listType = (Class<?>)tp;
+						isModel = isJsonModel(listType);
+						break;
+					}
+					
+					for( int i=0; i<jsonList.length(); i++){
+						if(isModel){
+							listItem = getValueFromModel(listType, jsonList.getJSONObject(i));
+							
+						}else{
+							listItem = jsonList.get(i);
+						}
+						
+						//if(listItem!=null)
+							tempList.add(listItem);
+					}
+					field.set(this, tempList);
+				}
+				
 				set = true;
+			}else if( isJsonModel(field)){
+				if (!json.isNull(key)){
+					field.set(this, getValueFromModel(fieldType, json.getJSONObject(key)) );
+					set = true;
+				}
+			}else{
+				Method summoner;
+				summoner = json.getClass().getMethod(buildGetMethod(fieldType.getName()), String.class);
+				if (!json.isNull(key)) {
+					field.set(this, summoner.invoke(json, key));
+					set = true;
+				}
 			}
 			
+			field.setAccessible(isAccessible);
 		} catch(NoSuchFieldException e){
 			handleFieldNotFound(e, property, key);
-		} catch (InvocationTargetException e) {
+		} catch(JSONException e){
+			e.printStackTrace();
+		} catch(InstantiationException e){
+			e.printStackTrace();
+		} catch(ClassNotFoundException e){
 			e.printStackTrace();
 		} catch (NoSuchMethodException e) {
 			e.printStackTrace();
 		} catch (IllegalAccessException e) {
 			e.printStackTrace();
+		} catch (InvocationTargetException e) {
+			e.printStackTrace();
 		}
-
+		
 		return set;
+	}
+	
+	
+	protected Object getValueFromModel(Class fieldType, JSONObject json) throws
+			ClassNotFoundException,
+			IllegalAccessException,
+			InstantiationException, 
+			NoSuchMethodException, 
+			JSONException, 
+			InvocationTargetException 
+	{
+		Method callerModel;
+		Class<?> modelClass = Class.forName(fieldType.getName());
+		Object model = modelClass.newInstance();
+		
+		callerModel = modelClass.getMethod("fromJson", Object.class);
+		callerModel.invoke(model, json);
+		
+		return model;
 	}
 	
 	protected String toCamelCase(String name) {
@@ -103,6 +177,36 @@ public abstract class JsonModel{
 
 	private String buildSetMethod(String typeName) {
 		return buildMethodName(typeName, false);
+	}
+	
+	protected boolean isList(Field field){
+		return compareWith(field, "java.util.List");
+	}
+	
+	protected boolean isJsonModel(Field field){
+		boolean isModel = JsonModel.class.isAssignableFrom(field.getType());
+		return isModel;
+	}
+	
+	protected boolean isJsonModel(Class<?> type){
+		boolean isModel = false;
+		isModel = JsonModel.class.isAssignableFrom(type);
+		
+		return isModel;
+	}
+	
+	protected Type[] getListTypes(Type type){
+		Type[] arr = new Type[3];
+		if( type instanceof ParameterizedType){
+			ParameterizedType pType = (ParameterizedType)type;
+			arr = pType.getActualTypeArguments();
+		}
+		
+		return arr;
+	}
+	
+	private boolean compareWith(Field field, String compareTo){		
+		return compareTo.equals(field.getType().getName());
 	}
 	
 	protected void handleFieldNotFound(NoSuchFieldException exception, String property, String key){
