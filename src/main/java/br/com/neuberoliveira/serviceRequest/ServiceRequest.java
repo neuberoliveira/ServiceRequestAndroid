@@ -360,7 +360,7 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 		if (isDebugMode()) {
 			Log.d(LOG_ID, "Request to: [" + getRequestMethod() + "] " + getFullURL());
 			Log.d(LOG_ID, "The response code is: " + getRequestStatus());
-			Log.d(LOG_ID, "The response raw: " + getServerResponse());
+			Log.d(LOG_ID, "The response raw: " + getRawServerResponse());
 			Log.d(LOG_ID, "Parameters: " + TextUtils.join("&", parametersList));
 			//Log.d(LOG_ID, "Uploads: " + TextUtils.join("&", uploadList));
 			Log.d(LOG_ID, "Full Request: \n" + fullRequest);
