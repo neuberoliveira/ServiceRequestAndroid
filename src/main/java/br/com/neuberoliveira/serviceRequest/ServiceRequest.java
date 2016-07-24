@@ -53,7 +53,8 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 	protected Context context;
 	protected Object jsonResponse = null;
 	protected HttpURLConnection conn;
-	protected String serverResponse = "";
+	protected Object serverResponse;
+	protected String serverResponseRaw = "";
 	protected int requestStatus = 0;
 	protected String requestMethod = METHOD_GET;
 	protected String requestEndpoint = "";
@@ -89,8 +90,13 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 	protected abstract void defPositiveButton();
 	
 	public ServiceRequest(Context ctx) {
+		this(ctx, null);
+	}
+	
+	public ServiceRequest(Context ctx, ServiceRequestCallbackInterface callback) {
 		this.context = ctx;
-
+		this.listener = callback;
+		
 		defBaseURL();
 		defNoConnectionMessage();
 		defNoConnectionTitle();
@@ -179,12 +185,20 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 	public boolean isPost() {
 		return getRequestMethod().equals(METHOD_POST);
 	}
-
-	public String getServerResponse() {
+	
+	public String getRawServerResponse() {
+		return serverResponseRaw;
+	}
+	
+	public void setRawServerResponse(String response) {
+		serverResponseRaw = response;
+	}
+	
+	public Object getServerResponse() {
 		return serverResponse;
 	}
 
-	protected void setServerResponse(String serverResponse) {
+	protected void setServerResponse(Object serverResponse) {
 		this.serverResponse = serverResponse;
 	}
 
@@ -215,37 +229,9 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 	protected boolean isCheckForConnection() {
 		return checkForConnection;
 	}
-
-	public Object getJsonResponse() {
-		return jsonResponse;
-	}
-
-	protected void setJsonResponse(Object jsonResponse) {
-		this.jsonResponse = jsonResponse;
-	}
-
-	@SuppressWarnings("unused")
-	public JSONObject getObjectResponse() throws NullPointerException {
-		Object json = getJsonResponse();
-
-		if (json == null) {
-			throw new NullPointerException();
-		}
-
-		return (JSONObject) json;
-	}
-
-	@SuppressWarnings("unused")
-	public JSONArray getArrayResponse() throws NullPointerException {
-		Object json = getJsonResponse();
-
-		if (json == null) {
-			throw new NullPointerException();
-		}
-
-		return (JSONArray) json;
-	}
-
+	
+	
+	
 	//Configure request
 	@SuppressWarnings("unused")
 	public ServiceRequest makeGet() {
@@ -266,7 +252,7 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 	}
 
 	@SuppressWarnings("unused")
-	public ServiceRequest callback(ServiceRequestCallbackInterface srci) {
+	public ServiceRequest then(ServiceRequestCallbackInterface srci){
 		listener = srci;
 		return this;
 	}
@@ -297,15 +283,10 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 	//Make Request
 	public Object request() {
 		InputStream inputStream = null;
-		restoreState();
 		URL url;
 
 		//boolean isGet = isGet( method );
 		boolean isPost = isPost();
-
-		//return from saved instace :)
-		if (getJsonResponse() != null)
-			return getJsonResponse();
 
 		buildParamsList();
 
@@ -361,15 +342,15 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 
 		try {
 			if (inputStream != null) {
-				setServerResponse(getStringResponse(inputStream));
+				setRawServerResponse(getStringResponse(inputStream));
 				inputStream.close();
 			} else if(conn.getErrorStream()!=null) {
-				setServerResponse(getStringResponse(conn.getErrorStream()));
+				setRawServerResponse(getStringResponse(conn.getErrorStream()));
 			}else{
-				setServerResponse("No response stream");
+				setRawServerResponse("No response stream");
 			}
 
-			setJsonResponse(parseResponse(getServerResponse()));
+			setServerResponse(parseResponse(getRawServerResponse()));
 			setRequestStatus(conn.getResponseCode());
 		} catch (IOException e) {
 			if (isDebugMode())
@@ -402,12 +383,7 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 			setServerResponse(response);
 		}
 	}
-
-	@SuppressWarnings("unused")
-	public void saveInstanceState(Bundle state) {
-		state.putCharSequence(JSON_RESPONSE_STATE, getServerResponse());
-	}
-
+	
 	//Build request parameters
 	protected List<String> buildParamsList() {
 		for(Parameter param : params){
@@ -627,18 +603,7 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 
 		alert.show();
 	}
-
-	protected Object restoreState() {
-		if (!getServerResponse().isEmpty()) {
-			setJsonResponse(parseResponse(getServerResponse()));
-
-			callCallback();
-		}
-
-		return getJsonResponse();
-	}
-
-
+	
 	protected void handleOOMException(OutOfMemoryError oomExeption) {
 		if (isDebugMode())
 			oomExeption.printStackTrace();
@@ -676,7 +641,11 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 
 	protected void callCallback() {
 		if (listener != null) {
-			listener.updateUI(this);
+			
+			if(isSuccess())
+				listener.onSuccess(this);
+			else
+				listener.onFail(this);
 		}
 	}
 
@@ -722,7 +691,7 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 			}
 		}*/
 
-		return getJsonResponse();
+		return getServerResponse();
 	}
 
 	protected void onPostExecute(Object json) {
@@ -739,8 +708,12 @@ public abstract class ServiceRequest extends AsyncTask<String, Void, Object> {
 		callCallback();
 	}
 
-	public boolean isStatusOK() {
+	public boolean isSuccess() {
 		return getRequestStatus() >=200 && getRequestStatus() <= 299 ;
+	}
+
+	public boolean isError() {
+		return !isSuccess();
 	}
 
 

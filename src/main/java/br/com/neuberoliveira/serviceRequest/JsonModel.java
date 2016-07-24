@@ -13,8 +13,8 @@ import java.util.Iterator;
 /**
  * Created by neuber on 29/08/15.
  */
-public abstract class BaseJsonHolder {
-    private BaseJsonHolder instance;
+public abstract class JsonModel{
+    private JsonModel instance;
     private Class instanceClass;
 
     public void fillFromJson(JSONObject json) throws JSONException {
@@ -70,11 +70,11 @@ public abstract class BaseJsonHolder {
         return set;
     }
 
-    public BaseJsonHolder getSuperInstance() {
+    public JsonModel getSuperInstance() {
         return instance;
     }
 
-    protected void setSuperInstance(BaseJsonHolder inst) {
+    protected void setSuperInstance(JsonModel inst) {
         instance = inst;
         instanceClass = inst.getClass();
     }
